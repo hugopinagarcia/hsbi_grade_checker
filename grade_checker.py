@@ -1,10 +1,11 @@
 import os
 import sys
 import requests
+import time
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 
-# --- CONFIGURATION (via Environment Variables) --- 
+# --- CONFIGURATION --- 
 USERNAME = os.getenv("HSBI_USER")
 PASSWORD = os.getenv("HSBI_PASS")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -14,20 +15,19 @@ LOGIN_URL = "https://www.hsbi.de/qisserver/rds?state=user&type=0"
 
 def send_telegram(message):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        print("Telegram credentials missing, skipping notification.")
+        print("Telegram credentials missing.")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
     try:
-        requests.post(url, json=payload)
+        requests.post(url, json=payload, timeout=10)
     except Exception as e:
         print(f"Failed to send Telegram: {e}")
 
 def get_grade_data():
     with sync_playwright() as p:
-        # 1. Use a very specific browser launch to look human
+        # Launch with a realistic User-Agent to bypass bot detection
         browser = p.chromium.launch(headless=True)
-        # We add extra arguments to bypass common bot detection
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             viewport={'width': 1280, 'height': 800}
@@ -36,17 +36,16 @@ def get_grade_data():
 
         try:
             print(f"Navigating to: {LOGIN_URL}")
-            # Increase timeout and wait for the page to be completely still
-            page.goto(LOGIN_URL, wait_until="commit", timeout=60000)
+            # Wait until the basic page structure is loaded
+            page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=60000)
             
-            # Wait a few seconds for any redirects or "Please wait" screens to finish
+            # --- MANDATORY FIRST LOOK SCREENSHOT ---
+            # This shows us exactly what the bot sees first (Cookie banners, etc.)
             page.wait_for_timeout(5000) 
+            page.screenshot(path="first_view.png")
+            print("Captured first_view.png - Checking for login fields...")
 
-            # Check if we are on the right page
-            print(f"Current URL after load: {page.url}")
-
-            # 2. Robust Credential Entry
-            # We look for the 'asdf' field but handle the case where it's not there
+            # Use smart selectors to find 'asdf' or any username field
             username_field = page.locator('input[name="asdf"]')
             username_field.wait_for(state="visible", timeout=20000)
             
@@ -54,47 +53,42 @@ def get_grade_data():
             username_field.fill(USERNAME)
             page.fill('input[name="fdsa"]', PASSWORD)
             
-            # 3. Submit
+            # Use the specific button ID from your screenshot
             print("Submitting login...")
             page.click('button[id="loginForm:login"]')
             page.wait_for_load_state("networkidle")
 
-            # 4. Navigation (Based on your screenshots)
+            # Navigation to Notenspiegel
             print("Navigating to Prüfungsverwaltung...")
-            # We use 'link' name matching which is very reliable in Playwright
             page.get_by_role("link", name="Prüfungsverwaltung").click()
+            page.wait_for_load_state("networkidle")
             
             print("Navigating to Notenspiegel...")
             page.get_by_role("link", name="Notenspiegel").click()
+            page.wait_for_load_state("networkidle")
             
-            # 5. Click the info icon (The little blue 'i')
+            # Using the exact title from your blue 'i' icon screenshot
             print("Opening grade details...")
-            # Using the exact title from your screenshot
             page.locator('a[title="Leistungen für Abschluss BA Bachelor anzeigen"]').click()
 
-            # 6. Final Wait for Table
-            page.wait_for_selector('table', timeout=20000)
+            # Final Wait for Table
+            page.wait_for_selector('table', timeout=30000)
             print("Grades found!")
             
             content = page.content()
-            browser.close()
             return content
 
         except Exception as e:
-            # This is key: it saves exactly what the bot saw so you can view it in GitHub
+            # Save the visual state of the failure for debugging
             page.screenshot(path="debug_error.png")
-            print(f"Detailed Error: {e}")
-            browser.close()
+            print(f"Scraper Error: {e}")
             raise e
+        finally:
+            browser.close()
 
 def parse_count(html):
     soup = BeautifulSoup(html, 'html.parser')
-    # We target the rows in the results table
-    # Your HTML uses 'tabelle1_alignleft' for exam names
-    rows = soup.find_all('td', class_='tabelle1_alignleft')
-    
-    # Filter for exam titles (avoiding IDs or dates)
-    # Based on your HTML, the exam text is in the 2nd column of each row
+    # Count rows using your specific class
     exam_names = []
     for row in soup.find_all('tr'):
         cols = row.find_all('td', class_='tabelle1_alignleft')
@@ -102,43 +96,33 @@ def parse_count(html):
             name = cols[1].get_text(strip=True)
             if "Durchschnittsnote" not in name:
                 exam_names.append(name)
-    
-    return len(exam_names), exam_names
+    return len(exam_names)
 
 def main():
     if not USERNAME or not PASSWORD:
-        print("Error: HSBI credentials not set in environment variables.")
+        print("Error: HSBI credentials not set.")
         sys.exit(1)
 
     try:
         html = get_grade_data()
-        current_count, exams = parse_count(html)
+        current_count = parse_count(html)
         print(f"Current exam count: {current_count}")
 
-        # Load last count
         last_count = 0
         if os.path.exists(DATA_FILE):
             with open(DATA_FILE, "r") as f:
                 last_count = int(f.read().strip())
 
-        # Logic for notification
         if current_count > last_count:
             diff = current_count - last_count
-            msg = f"🎓 HSBI ALERT: {diff} new result(s) added!\nTotal exams: {current_count}"
-            print(msg)
-            send_telegram(msg)
-            
-            # Save new count
+            send_telegram(f"🎓 HSBI ALERT: {diff} new result(s) added!\nTotal exams: {current_count}")
             with open(DATA_FILE, "w") as f:
                 f.write(str(current_count))
         else:
             print("No new results found.")
 
     except Exception as e:
-        error_msg = f"Scraper Error: {str(e)}"
-        print(error_msg)
-        # Uncomment the next line if you want to be notified of errors
-        # send_telegram(error_msg)
+        print(f"Script failed: {e}")
 
 if __name__ == "__main__":
     main()
