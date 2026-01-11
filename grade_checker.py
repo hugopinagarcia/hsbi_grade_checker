@@ -25,36 +25,64 @@ def send_telegram(message):
 
 def get_grade_data():
     with sync_playwright() as p:
-        # Launching Chromium
+        # 1. Launch browser with a real User-Agent to avoid being blocked
+        # Using a MacBook Chrome signature makes the bot look like a real user.
         browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        )
         page = context.new_page()
 
-        print("Navigating to HSBI Login...")
-        page.goto(LOGIN_URL)
-        
-        # LSF portals often use 'asdf' and 'fdsa' for login fields
-        page.fill('input[name="asdf"]', USERNAME)
-        page.fill('input[name="fdsa"]', PASSWORD)
-        page.click('button[name="login"], input[type="submit"]')
-        
-        # Wait for login to complete (looking for logout link)
-        page.wait_for_selector('a[href*="logout"]')
+        try:
+            print("Navigating to HSBI Login...")
+            # 'networkidle' ensures the page is fully loaded before we interact
+            page.goto(LOGIN_URL, wait_until="networkidle", timeout=60000)
+            
+            # 2. Fill login credentials using the exact names from your HTML screenshot
+            print("Entering credentials...")
+            page.wait_for_selector('input[name="asdf"]', timeout=15000)
+            page.fill('input[name="asdf"]', USERNAME)
+            page.fill('input[name="fdsa"]', PASSWORD)
+            
+            # 3. Click login using the specific ID from your screenshot
+            print("Submitting login form...")
+            page.click('button[id="loginForm:login"]')
+            
+            # Wait for the post-login page to load
+            page.wait_for_load_state("networkidle")
 
-        # Navigation steps based on your HTML structure
-        print("Navigating to Notenspiegel...")
-        page.get_by_role("link", name="Prüfungsverwaltung").click()
-        page.get_by_role("link", name="Notenspiegel").click()
-        
-        # Click the info icon for [BA] Bachelor
-        # This matches the 'i' icon next to your degree
-        page.locator('a[title^="Leistungen für Abschluss [BA]"]').click()
+            # 4. Navigation to Notenspiegel
+            print("Navigating to Prüfungsverwaltung...")
+            # We use a slight delay or wait to ensure the menu is interactable
+            page.get_by_role("link", name="Prüfungsverwaltung").wait_for(state="visible")
+            page.get_by_role("link", name="Prüfungsverwaltung").click()
+            
+            print("Navigating to Notenspiegel...")
+            page.get_by_role("link", name="Notenspiegel").wait_for(state="visible")
+            page.get_by_role("link", name="Notenspiegel").click()
+            
+            # 5. Click the info icon for [BA] Bachelor
+            print("Opening grade details...")
+            # Using a broader selector in case the title varies slightly
+            info_link = page.locator('a[title*="Bachelor"], a[title*="Leistungen"]').first
+            info_link.wait_for(state="visible")
+            info_link.click()
 
-        # Wait for the results table
-        page.wait_for_selector('table')
-        content = page.content()
-        browser.close()
-        return content
+            # 6. Extract the results
+            # We wait for the specific table headers to ensure the data is there
+            page.wait_for_selector('th.tabelleheader', timeout=20000)
+            print("Grades loaded successfully.")
+            
+            content = page.content()
+            browser.close()
+            return content
+
+        except Exception as e:
+            # If it fails, save a screenshot so you can see why in your GitHub repo
+            print(f"Scraper Error encountered: {e}")
+            page.screenshot(path="debug_error.png")
+            browser.close()
+            raise e
 
 def parse_count(html):
     soup = BeautifulSoup(html, 'html.parser')
