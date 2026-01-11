@@ -1,0 +1,44 @@
+name: University Grade Checker
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # Runs every 30 minutes
+  workflow_dispatch:        # Allows you to click a "Run" button manually
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    # Give GitHub permission to write the text file back to your repo
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+
+      - name: Run Scraper
+        env:
+          HSBI_USER: ${{ secrets.HSBI_USER }}
+          HSBI_PASS: ${{ secrets.HSBI_PASS }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python grade_checker.py
+
+      - name: Save and Push Changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add last_grade_count.txt
+          # Only commit if the file actually changed
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update grade count"
+          git push
