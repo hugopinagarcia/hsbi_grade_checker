@@ -11,7 +11,7 @@ PASSWORD = os.getenv("HSBI_PASS")
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 DATA_FILE = "last_grade_count.txt"
-LOGIN_URL = "https://https://www.hsbi.de/qisserver/rds?state=wlogin&login=in&breadCrumbSource=portal"
+LOGIN_URL = "https://www.hsbi.de/qisserver/rds?state=wlogin&login=in&breadCrumbSource=portal"
 
 def send_telegram(message):
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
