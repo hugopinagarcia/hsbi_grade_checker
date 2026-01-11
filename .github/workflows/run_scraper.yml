@@ -2,13 +2,12 @@ name: University Grade Checker
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Runs every 30 minutes
-  workflow_dispatch:        # Allows you to click a "Run" button manually
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    # Give GitHub permission to write the text file back to your repo
     permissions:
       contents: write
 
@@ -23,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install playwright beautifulsoup4 requests
           playwright install chromium
 
       - name: Run Scraper
@@ -34,11 +33,18 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python grade_checker.py
 
-      - name: Save and Push Changes
+      - name: Save Count
+        if: success()
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add last_grade_count.txt
-          # Only commit if the file actually changed
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update grade count"
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update count"
           git push
+
+      - name: Upload Screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-view
+          path: "*.png"
