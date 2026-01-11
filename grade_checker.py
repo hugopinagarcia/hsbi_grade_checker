@@ -26,7 +26,6 @@ def send_telegram(message):
 
 def get_grade_data():
     with sync_playwright() as p:
-        # Launch with a realistic User-Agent to bypass bot detection
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -36,30 +35,29 @@ def get_grade_data():
 
         try:
             print(f"Navigating to: {LOGIN_URL}")
-            # Wait until the basic page structure is loaded
             page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=60000)
             
-            # --- MANDATORY FIRST LOOK SCREENSHOT ---
-            # This shows us exactly what the bot sees first (Cookie banners, etc.)
-            page.wait_for_timeout(5000) 
-            page.screenshot(path="first_view.png")
-            print("Captured first_view.png - Checking for login fields...")
-
-            # Use smart selectors to find 'asdf' or any username field
-            username_field = page.locator('input[name="asdf"]')
-            username_field.wait_for(state="visible", timeout=20000)
-            
-            print("Entering credentials...")
-            username_field.fill(USERNAME)
+            # --- LOGIN STEP ---
+            page.wait_for_selector('input[name="asdf"]', timeout=20000)
+            page.fill('input[name="asdf"]', USERNAME)
             page.fill('input[name="fdsa"]', PASSWORD)
             
-            # Use the specific button ID from your screenshot
             print("Submitting login...")
+            # Click and wait for the page to stabilize after login
             page.click('button[id="loginForm:login"]')
             page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(3000) # Safety buffer for session tokens
 
-            # Navigation to Notenspiegel
+            # --- NEW STEP: MEINE FUNKTIONEN ---
+            # Based on your 'Bildschirmfoto' screenshot, we click the top-level tab first
+            print("Clicking 'Meine Funktionen' tab...")
+            page.get_by_role("link", name="Meine Funktionen").first.click()
+            page.wait_for_load_state("networkidle")
+
+            # --- NAVIGATION TO GRADES ---
             print("Navigating to Prüfungsverwaltung...")
+            # Using wait_for_selector to ensure the side menu appeared
+            page.wait_for_selector('text=Prüfungsverwaltung', timeout=15000)
             page.get_by_role("link", name="Prüfungsverwaltung").click()
             page.wait_for_load_state("networkidle")
             
@@ -67,11 +65,11 @@ def get_grade_data():
             page.get_by_role("link", name="Notenspiegel").click()
             page.wait_for_load_state("networkidle")
             
-            # Using the exact title from your blue 'i' icon screenshot
             print("Opening grade details...")
+            # Using title matching from your inspection screenshot
             page.locator('a[title="Leistungen für Abschluss BA Bachelor anzeigen"]').click()
 
-            # Final Wait for Table
+            # Final Table Wait
             page.wait_for_selector('table', timeout=30000)
             print("Grades found!")
             
@@ -79,7 +77,6 @@ def get_grade_data():
             return content
 
         except Exception as e:
-            # Save the visual state of the failure for debugging
             page.screenshot(path="debug_error.png")
             print(f"Scraper Error: {e}")
             raise e
