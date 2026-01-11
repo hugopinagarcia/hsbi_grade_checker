@@ -25,62 +25,65 @@ def send_telegram(message):
 
 def get_grade_data():
     with sync_playwright() as p:
-        # 1. Launch browser with a real User-Agent to avoid being blocked
-        # Using a MacBook Chrome signature makes the bot look like a real user.
+        # 1. Use a very specific browser launch to look human
         browser = p.chromium.launch(headless=True)
+        # We add extra arguments to bypass common bot detection
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            viewport={'width': 1280, 'height': 800}
         )
         page = context.new_page()
 
         try:
-            print("Navigating to HSBI Login...")
-            # 'networkidle' ensures the page is fully loaded before we interact
-            page.goto(LOGIN_URL, wait_until="networkidle", timeout=60000)
+            print(f"Navigating to: {LOGIN_URL}")
+            # Increase timeout and wait for the page to be completely still
+            page.goto(LOGIN_URL, wait_until="commit", timeout=60000)
             
-            # 2. Fill login credentials using the exact names from your HTML screenshot
+            # Wait a few seconds for any redirects or "Please wait" screens to finish
+            page.wait_for_timeout(5000) 
+
+            # Check if we are on the right page
+            print(f"Current URL after load: {page.url}")
+
+            # 2. Robust Credential Entry
+            # We look for the 'asdf' field but handle the case where it's not there
+            username_field = page.locator('input[name="asdf"]')
+            username_field.wait_for(state="visible", timeout=20000)
+            
             print("Entering credentials...")
-            page.wait_for_selector('input[name="asdf"]', timeout=15000)
-            page.fill('input[name="asdf"]', USERNAME)
+            username_field.fill(USERNAME)
             page.fill('input[name="fdsa"]', PASSWORD)
             
-            # 3. Click login using the specific ID from your screenshot
-            print("Submitting login form...")
+            # 3. Submit
+            print("Submitting login...")
             page.click('button[id="loginForm:login"]')
-            
-            # Wait for the post-login page to load
             page.wait_for_load_state("networkidle")
 
-            # 4. Navigation to Notenspiegel
+            # 4. Navigation (Based on your screenshots)
             print("Navigating to Prüfungsverwaltung...")
-            # We use a slight delay or wait to ensure the menu is interactable
-            page.get_by_role("link", name="Prüfungsverwaltung").wait_for(state="visible")
+            # We use 'link' name matching which is very reliable in Playwright
             page.get_by_role("link", name="Prüfungsverwaltung").click()
             
             print("Navigating to Notenspiegel...")
-            page.get_by_role("link", name="Notenspiegel").wait_for(state="visible")
             page.get_by_role("link", name="Notenspiegel").click()
             
-            # 5. Click the info icon for [BA] Bachelor
+            # 5. Click the info icon (The little blue 'i')
             print("Opening grade details...")
-            # Using a broader selector in case the title varies slightly
-            info_link = page.locator('a[title*="Bachelor"], a[title*="Leistungen"]').first
-            info_link.wait_for(state="visible")
-            info_link.click()
+            # Using the exact title from your screenshot
+            page.locator('a[title="Leistungen für Abschluss BA Bachelor anzeigen"]').click()
 
-            # 6. Extract the results
-            # We wait for the specific table headers to ensure the data is there
-            page.wait_for_selector('th.tabelleheader', timeout=20000)
-            print("Grades loaded successfully.")
+            # 6. Final Wait for Table
+            page.wait_for_selector('table', timeout=20000)
+            print("Grades found!")
             
             content = page.content()
             browser.close()
             return content
 
         except Exception as e:
-            # If it fails, save a screenshot so you can see why in your GitHub repo
-            print(f"Scraper Error encountered: {e}")
+            # This is key: it saves exactly what the bot saw so you can view it in GitHub
             page.screenshot(path="debug_error.png")
+            print(f"Detailed Error: {e}")
             browser.close()
             raise e
 
