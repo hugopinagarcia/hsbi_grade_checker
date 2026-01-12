@@ -1,6 +1,6 @@
-# 🎓 HSBI Grade Notifier
+# 🎓 Grade Notifier
 
-Automated grade monitoring for the **Hochschule Bielefeld (HSBI)** LSF portal. Receive instant Telegram notifications whenever a new grade is posted.
+Automated grade monitoring for the LSF portal. Receive instant Telegram notifications whenever a new grade is posted.
 
 ## 📋 Table of Contents
 1. [Features](#-features)
@@ -11,7 +11,6 @@ Automated grade monitoring for the **Hochschule Bielefeld (HSBI)** LSF portal. R
 
 ## ✨ Features
 * **Automated Checks:** Runs every 30 minutes via GitHub Actions.
-* **Detailed Notifications:** Sends a full list of exams and grades directly to your phone.
 * **Session Stability:** Uses custom navigation to bypass portal "Java Exceptions".
 * **Visual Debugging:** Automatically captures screenshots if a login fails.
 
