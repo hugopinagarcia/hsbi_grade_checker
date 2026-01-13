@@ -29,6 +29,7 @@ You need a private bot to act as your personal notifier.
 
 ## ⚙️ GitHub Configuration
 After forking this repository, follow these steps to link your account.
+Make sure your forked repository is private.
 
 ### 1. Repository Secrets
 1. Go to **Settings** > **Secrets and variables** > **Actions**.
