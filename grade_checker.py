@@ -48,8 +48,7 @@ def get_grade_data():
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(3000) # Safety buffer for session tokens
 
-            # --- NEW STEP: MEINE FUNKTIONEN ---
-            # Based on your 'Bildschirmfoto' screenshot, we click the top-level tab first
+            # --- MEINE FUNKTIONEN ---
             print("Clicking 'Meine Funktionen' tab...")
             page.get_by_role("link", name="Meine Funktionen").first.click()
             page.wait_for_load_state("networkidle")
@@ -66,7 +65,7 @@ def get_grade_data():
             page.wait_for_load_state("networkidle")
             
             print("Opening grade details...")
-            # Using title matching from your inspection screenshot
+            # Using title matching 
             page.locator('a[title="Leistungen für Abschluss BA Bachelor anzeigen"]').click()
 
             # Final Table Wait
@@ -77,7 +76,7 @@ def get_grade_data():
             return content
 
         except Exception as e:
-            page.screenshot(path="debug_error.png")
+            #removed Screenshot for security reasons
             print(f"Scraper Error: {e}")
             raise e
         finally:
