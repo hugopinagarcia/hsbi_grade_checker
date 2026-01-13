@@ -41,10 +41,3 @@ jobs:
           git add last_grade_count.txt
           git diff --quiet && git diff --staged --quiet || git commit -m "Update count"
           git push
-
-      - name: Upload Screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bot-view
-          path: "*.png"
