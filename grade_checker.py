@@ -42,25 +42,22 @@ def get_grade_data():
             page.fill('input[name="asdf"]', USERNAME)
             page.fill('input[name="fdsa"]', PASSWORD)
             
-            print("Submitting login...")
             # Click and wait for the page to stabilize after login
             page.click('button[id="loginForm:login"]')
             page.wait_for_load_state("networkidle")
             page.wait_for_timeout(3000) # Safety buffer for session tokens
 
             # --- MEINE FUNKTIONEN ---
-            print("Clicking 'Meine Funktionen' tab...")
             page.get_by_role("link", name="Meine Funktionen").first.click()
             page.wait_for_load_state("networkidle")
 
-            # --- NAVIGATION TO GRADES ---
-            print("Navigating to Prüfungsverwaltung...")
-            # Using wait_for_selector to ensure the side menu appeared
+            # --- NAVIGATION TO PRÜFUNGSVERWALTUNG ---
+            # Using wait_for_selector to ensure the side menu appeared         
             page.wait_for_selector('text=Prüfungsverwaltung', timeout=15000)
             page.get_by_role("link", name="Prüfungsverwaltung").click()
             page.wait_for_load_state("networkidle")
             
-            print("Navigating to Notenspiegel...")
+            # --- NAVIGATION TO NOTENSPIEGEL ---
             page.get_by_role("link", name="Notenspiegel").click()
             page.wait_for_load_state("networkidle")
             
@@ -70,7 +67,6 @@ def get_grade_data():
 
             # Final Table Wait
             page.wait_for_selector('table', timeout=30000)
-            print("Grades found!")
             
             content = page.content()
             return content
