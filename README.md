@@ -47,12 +47,5 @@ Make sure your forked repository is private.
 ## 🚀 How to Start & Test
 1. Click the **Actions** tab at the top of the repository.
 2. Click **"I understand my workflows, go ahead and enable them"**.
-3. Select **University Grade Checker** from the sidebar.
+3. Select **University Grade Checker** from the sidebar on the left.
 4. Click **Run workflow** > **Run workflow**.
-
-## 🛠️ Troubleshooting & Debugging
-If the automation fails (Red X in Actions):
-1. Click on the **failed run**.
-2. Go to the **Summary** page in the left sidebar.
-3. Scroll to the bottom to find **Artifacts**.
-4. Download **bot-view** to see `first_view.png` and `debug_error.png`. These images show exactly what the bot saw during the failure.
